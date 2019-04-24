@@ -42,7 +42,7 @@ def get_workshop_info():
     return workshop_info
 
 
-def parse_pref(lat, lon, geo_json):
+def parse_pref(lat, lon, address, geo_json):
     # refs. https://qiita.com/jagio/items/bdccc28d1b3c56233931
     if lat and lon:
         point = Point(float(lon), float(lat))
@@ -50,6 +50,10 @@ def parse_pref(lat, lon, geo_json):
             polygon = shape(feature['geometry'])
             if polygon.contains(point):
                 return feature['properties']['nam_ja'] # 市区町村名へアクセス
+    if address:
+        m = PREF_P.search(address)
+        if m:
+            return m[0]
     return None
 
 
@@ -66,7 +70,7 @@ def main():
                 row = {
                     'month': k,
                     'title': event['title'],
-                    'prefecture': parse_pref(event['lat'], event['lon'], geo_json),
+                    'prefecture': parse_pref(event['lat'], event['lon'], event['address'], geo_json),
                     'address': event['address'],
                     'lat': event['lat'],
                     'lon': event['lon']
