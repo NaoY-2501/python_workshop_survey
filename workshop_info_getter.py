@@ -1,16 +1,20 @@
 import csv
 import json
 import pickle
+import re
 
 from collections import defaultdict
 
 import requests
 
 from tqdm import tqdm
+from shapely.geometry import shape, Point
 
 URL = 'https://connpass.com/api/v1/event/'
 
 MONTHS = [month for month in range(201801, 201813, 1)]
+
+PREF_P = re.compile(r'\w{2,3}[都道府県]')
 
 
 def exec_api(month, start=1):
@@ -38,15 +42,31 @@ def get_workshop_info():
     return workshop_info
 
 
+def parse_pref(lat, lon, geo_json):
+    # refs. https://qiita.com/jagio/items/bdccc28d1b3c56233931
+    if lat and lon:
+        point = Point(float(lon), float(lat))
+        for feature in geo_json['features']:
+            polygon = shape(feature['geometry'])
+            if polygon.contains(point):
+                return feature['properties']['nam_ja'] # 市区町村名へアクセス
+    return None
+
+
 def main():
+    with open('data/japan.geojson') as f:
+        # 出典元: 地球地図日本 (http://www.gsi.go.jp/kankyochiri/gm_jpn.html)
+        geo_json = json.load(f)
     workshop_info = get_workshop_info()
-    with open('python_wokrshop_list.csv', 'w') as csvfile:
-        dictwriter = csv.DictWriter(csvfile, fieldnames=['month', 'title', 'address', 'lat', 'lon'])
+    with open('data/python_workshop_list.csv', 'w') as csvfile:
+        dictwriter = csv.DictWriter(csvfile, fieldnames=['month', 'title', 'prefecture', 'address', 'lat', 'lon'])
+        dictwriter.writeheader()
         for k, v in workshop_info.items():
             for event in v:
                 row = {
                     'month': k,
                     'title': event['title'],
+                    'prefecture': parse_pref(event['lat'], event['lon'], geo_json),
                     'address': event['address'],
                     'lat': event['lat'],
                     'lon': event['lon']
